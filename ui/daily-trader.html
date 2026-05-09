@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Daily Trader — MMK</title>
+    <link rel="stylesheet" href="/ui/styles.css?v=9" />
+    <link rel="stylesheet" href="/ui/daily-trader.css?v=3" />
+    <meta http-equiv="Cache-Control" content="no-store" />
+  </head>
+  <body>
+    <main class="container">
+      <div class="dt-topbar">
+        <h1>Daily Auto Trader</h1>
+        <div class="dt-topbar-right">
+          <a href="/" class="sidebar-link-btn">Dashboard</a>
+        </div>
+      </div>
+
+      <!-- ── Orphan banner (hidden by default) ───────────────────── -->
+      <div id="dt-orphan-banner" class="dt-orphan-banner" style="display:none">
+        <div class="dt-orphan-text">
+          <strong id="dt-orphan-title">Open positions detected.</strong>
+          <span id="dt-orphan-msg">Bot is STOPPED — target/stop are NOT being monitored.</span>
+        </div>
+        <div class="dt-orphan-actions">
+          <button id="dt-orphan-resume" class="btn-primary small">Resume Management</button>
+          <button id="dt-orphan-close-all" class="btn-danger small">Close All</button>
+        </div>
+      </div>
+
+      <!-- ── Status & Controls ─────────────────────────────────── -->
+      <section class="card">
+        <div class="dt-status-bar">
+          <div class="dt-state-block">
+            <span class="dt-state-label">Bot State</span>
+            <span id="dt-state-pill" class="dt-state-pill stopped">STOPPED</span>
+            <span id="dt-halt-reason" class="dt-halt-reason"></span>
+            <span class="dt-state-label" style="margin-left:14px">Market</span>
+            <span id="dt-market-pill" class="dt-state-pill stopped">UNKNOWN</span>
+          </div>
+          <div class="dt-controls">
+            <button id="dt-start-btn" class="btn-primary"   title="Start the bot — it will begin scanning and trading">▶ Start</button>
+            <button id="dt-stop-btn"  class="btn-secondary" title="Stop the bot — no more new trades, open positions are left as-is">■ Stop</button>
+            <button id="dt-halt-btn"  class="btn-danger"    title="Halt — stop new entries but keep monitoring open positions">⛔ Halt</button>
+            <button id="dt-reset-btn" class="btn-secondary" title="Reset today's trade counters without stopping the bot">↺ Reset Day</button>
+            <button id="dt-sync-btn"  class="btn-secondary" title="Pull fresh data from the broker to re-sync positions and orders">⟳ Sync Broker</button>
+          </div>
+        </div>
+
+        <div class="dt-metrics-grid">
+          <div class="dt-metric"><span class="dt-metric-label">Time (PKT)</span>     <span id="dt-now"              class="dt-metric-value">-</span></div>
+          <div class="dt-metric"><span class="dt-metric-label">Today</span>           <span id="dt-day"              class="dt-metric-value">-</span></div>
+          <div class="dt-metric"><span class="dt-metric-label">Start Cash</span>      <span id="dt-start-cash"       class="dt-metric-value">-</span></div>
+          <div class="dt-metric"><span class="dt-metric-label">Current Cash</span>    <span id="dt-cur-cash"         class="dt-metric-value">-</span></div>
+          <div class="dt-metric"><span class="dt-metric-label">Day P/L (PKR)</span>   <span id="dt-day-pl"           class="dt-metric-value">-</span></div>
+          <div class="dt-metric"><span class="dt-metric-label">Realized</span>        <span id="dt-day-pl-realized"  class="dt-metric-value">-</span></div>
+          <div class="dt-metric"><span class="dt-metric-label">Unrealized</span>      <span id="dt-day-pl-unrealized" class="dt-metric-value">-</span></div>
+          <div class="dt-metric"><span class="dt-metric-label">Day P/L %</span>       <span id="dt-day-pl-pct"       class="dt-metric-value">-</span></div>
+          <div class="dt-metric"><span class="dt-metric-label">Trades Today</span>    <span id="dt-trades-today"     class="dt-metric-value">-</span></div>
+          <div class="dt-metric"><span class="dt-metric-label">Bought (PKR)</span>    <span id="dt-daily-buy-used"   class="dt-metric-value">-</span></div>
+          <div class="dt-metric"><span class="dt-metric-label">Sold (PKR)</span>      <span id="dt-daily-sell-used"  class="dt-metric-value">-</span></div>
+          <div class="dt-metric"><span class="dt-metric-label">Open Positions</span>  <span id="dt-open-count"       class="dt-metric-value">-</span></div>
+        </div>
+      </section>
+
+      <!-- ── Open Positions ─────────────────────────────────────── -->
+      <section class="card">
+        <div class="section-header">
+          <h2>Open Positions</h2>
+          <button id="dt-refresh-positions" class="btn-secondary small">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table id="dt-positions-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Symbol</th>
+                <th>Status</th>
+                <th title="Number of shares held">Qty</th>
+                <th title="Price at which we bought">Entry Price</th>
+                <th title="Current market price">Last Price</th>
+                <th title="Price at which bot will take profit">Target</th>
+                <th title="Price at which bot will cut loss">Stop</th>
+                <th title="Unrealised profit/loss in PKR">MTM P/L</th>
+                <th title="Unrealised profit/loss as percent">P/L %</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── Config ─────────────────────────────────────────────── -->
+      <section class="card">
+        <div class="section-header">
+          <h2>Configuration</h2>
+          <button id="dt-save-config" class="btn-primary small">Save Config</button>
+        </div>
+        <form id="dt-config-form" class="dt-config-form"></form>
+      </section>
+
+      <!-- ── Recent Signals ─────────────────────────────────────── -->
+      <section class="card">
+        <div class="section-header">
+          <h2>Recent Signals</h2>
+          <button id="dt-refresh-signals" class="btn-secondary small">Refresh</button>
+        </div>
+        <p class="dt-section-hint">Every stock the bot evaluated — green = it passed all filters and was bought, grey = it was rejected (hover the reason for details).</p>
+        <div class="table-wrap">
+          <table id="dt-signals-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Symbol</th>
+                <th title="Last traded price">Price</th>
+                <th title="Change % on the day">Change %</th>
+                <th title="Shares traded today">Volume</th>
+                <th title="Volume Weighted Average Price — fair value for the day">VWAP</th>
+                <th title="Bid-ask spread as % of price">Spread %</th>
+                <th title="Signal score — higher is better">Score</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── Daily Report ───────────────────────────────────────── -->
+      <section class="card">
+        <div class="section-header">
+          <h2>Today's Report</h2>
+          <button id="dt-refresh-report" class="btn-secondary small">Refresh</button>
+        </div>
+        <div id="dt-report-summary" class="dt-metrics-grid"></div>
+        <div class="table-wrap" style="margin-top:12px">
+          <table id="dt-report-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Symbol</th>
+                <th>Qty</th>
+                <th>Entry Price</th>
+                <th>Exit Price</th>
+                <th>P/L (PKR)</th>
+                <th>Reason Closed</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── Event Log ──────────────────────────────────────────── -->
+      <section class="card">
+        <div class="section-header">
+          <h2>Event Log</h2>
+          <button id="dt-refresh-events" class="btn-secondary small">Refresh</button>
+        </div>
+        <p class="dt-section-hint">Live log of every action the bot takes — orders placed, positions opened/closed, errors, and warnings.</p>
+        <div id="dt-events-list" class="dt-events"></div>
+      </section>
+    </main>
+
+    <script src="/ui/daily-trader.js?v=3"></script>
+  </body>
+</html>

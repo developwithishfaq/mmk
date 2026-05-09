@@ -1,0 +1,671 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f5f7fb;
+  color: #1f2937;
+}
+
+.login-container {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.login-card {
+  width: min(440px, 100%);
+}
+
+.container {
+  max-width: 1400px;
+  margin: 24px auto;
+  padding: 0 16px;
+}
+
+h1 {
+  margin: 0 0 16px;
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.sidebar {
+  position: static;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.single-column {
+  grid-template-columns: 1fr;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+input,
+select,
+button {
+  font: inherit;
+  padding: 8px 10px;
+}
+
+button {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #1e40af;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+th,
+td {
+  border: 1px solid #e5e7eb;
+  padding: 8px;
+  font-size: 13px;
+  text-align: left;
+}
+
+th {
+  background: #f3f4f6;
+}
+
+.result {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 10px;
+  min-height: 44px;
+  white-space: pre-wrap;
+}
+
+.quick-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.session-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.label {
+  color: #6b7280;
+}
+
+.market-pill {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #d1d5db;
+  color: #111827;
+}
+
+.market-pill.open {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.market-pill.closed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.cancel-btn {
+  background: #b91c1c;
+}
+
+.cancel-btn:hover {
+  background: #7f1d1d;
+}
+
+.logout-btn {
+  width: 100%;
+  background: #374151;
+}
+
+.logout-btn:hover {
+  background: #111827;
+}
+
+.muted {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.text-link {
+  color: #2563eb;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.text-link:hover {
+  text-decoration: underline;
+}
+
+.sidebar-link-btn {
+  display: block;
+  text-align: center;
+  padding: 8px 10px;
+  background: #0f766e;
+  color: #fff !important;
+  border-radius: 6px;
+  text-decoration: none;
+  font: inherit;
+}
+
+.sidebar-link-btn:hover {
+  background: #115e59;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-direction: row;
+}
+
+.strategies-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.strategy-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.strategy-meta {
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.strategy-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.strategy-card-head .pills {
+  display: flex;
+  gap: 6px;
+}
+
+.pill-dry {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+.test-tick-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: end;
+  margin-top: 8px;
+  padding: 8px;
+  background: #f3f4f6;
+  border-radius: 6px;
+}
+
+.test-tick-form input {
+  width: 88px;
+}
+
+.test-tick-form label {
+  font-size: 12px;
+  color: #4b5563;
+  display: flex;
+  flex-direction: column;
+}
+
+.strategy-actions .delete-strat {
+  background: #7f1d1d;
+}
+
+.pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.pill-on {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.pill-off {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.event-log {
+  font-size: 12px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 8px;
+}
+
+.event-line {
+  padding: 4px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.event-line:last-child {
+  border-bottom: none;
+}
+
+.act-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: capitalize;
+}
+
+.act-queued {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.act-filled {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.act-cancelled {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.act-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.act-partial {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.side-buy {
+  color: #166534;
+  font-weight: 600;
+}
+
+.side-sell {
+  color: #991b1b;
+  font-weight: 600;
+}
+
+.mono {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 11px;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+#reconnect-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: #f59e0b;
+  color: #111827;
+  text-align: center;
+  padding: 10px 16px;
+  font-weight: 700;
+  font-size: 14px;
+  animation: pulse-banner 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-banner {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* ── hidden utility ─── */
+.hidden { display: none !important; }
+
+/* ── positive / negative numbers ─── */
+.pos { color: #15803d; font-weight: 600; }
+.neg { color: #b91c1c; font-weight: 600; }
+
+/* ── Account Summary grid ─── */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.summary-item {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.summary-label {
+  font-size: 11px;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.summary-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+/* ── Tab group (Top Movers) ─── */
+.tab-group {
+  display: flex;
+  gap: 4px;
+}
+
+.tab-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #f9fafb;
+  cursor: pointer;
+  color: #374151;
+  transition: background 0.15s;
+}
+
+.tab-btn.active,
+.tab-btn:hover {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+/* ── Section header row ─── */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.section-header h2 {
+  margin: 0;
+}
+
+/* ── Action cell (cancel + change buttons) ─── */
+.action-cell {
+  display: flex;
+  gap: 4px;
+}
+
+.action-btn {
+  padding: 3px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid;
+}
+
+.cancel-btn {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+
+.cancel-btn:hover { background: #fee2e2; }
+
+.change-btn {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #93c5fd;
+}
+
+.change-btn:hover { background: #dbeafe; }
+
+/* ── Change Order Modal ─── */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-box {
+  background: #fff;
+  border-radius: 10px;
+  padding: 24px;
+  width: min(400px, 95vw);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+
+.modal-box h3 { margin: 0; }
+
+.modal-label {
+  font-size: 13px;
+  color: #6b7280;
+  word-break: break-all;
+  margin: 0;
+}
+
+.modal-box label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.modal-box label input {
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.btn-primary {
+  padding: 7px 18px;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn-primary:hover { background: #1d4ed8; }
+
+.btn-secondary {
+  padding: 7px 18px;
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn-secondary:hover { background: #e5e7eb; }
+
+.result-success {
+  color: #15803d;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.result-error {
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+/* ── Quick actions grid ─── */
+.quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.quick-actions button,
+.quick-actions .sidebar-link-btn {
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+/* ── Cash display ────────────────────────────────────────────────── */
+.cash-display {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+}
+
+.cash-label {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.cash-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.cash-value.pos { color: #16a34a; }
+.cash-value.neg { color: #dc2626; }
+
+/* ── Inline form row ─────────────────────────────────────────────── */
+.inline-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.inline-form input,
+.inline-form select {
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.form-inline-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #374151;
+}
+
+/* ── Number cells ────────────────────────────────────────────────── */
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.pos { color: #16a34a; }
+td.neg { color: #dc2626; }
+
+/* ── Status pills for withdrawals ────────────────────────────────── */
+.pill-pending  { background: #fef9c3; color: #92400e; }
+.pill-open     { background: #dcfce7; color: #166534; }
+.pill-cancel   { background: #fee2e2; color: #991b1b; }
+.pill-fill     { background: #dbeafe; color: #1e40af; }
+
+@media (max-width: 1100px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+}

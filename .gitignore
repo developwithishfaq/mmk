@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Runtime state (generated at run-time, not source)
+daily_trader_state.json
+auto_trade_state.json
+web_session_state.json
+watchlist_prices.csv
+
+# Logs
+logs/
+api_hits.jsonl
+
+# Claude internal files
+.claude/
+
+# Misc
+*.tmp
+mmk-decompiled-apk/
+TRADING_BOT_API_KEYS_REFERENCE.txt

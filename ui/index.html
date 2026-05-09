@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MMK Trading UI</title>
+    <link rel="stylesheet" href="/ui/styles.css?v=9" />
+    <meta http-equiv="Cache-Control" content="no-store" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>MMK Trading Dashboard</h1>
+      <div class="layout">
+        <aside class="sidebar">
+          <section class="card">
+            <h2>Session</h2>
+            <div class="session-row">
+              <span class="label">User</span>
+              <strong id="session-user">-</strong>
+            </div>
+            <div class="session-row">
+              <span class="label">Market</span>
+              <span id="session-market" class="market-pill">-</span>
+            </div>
+            <button id="logout-btn" type="button" class="logout-btn">Logout</button>
+          </section>
+
+          <section class="card">
+            <h2>Place Buy Order</h2>
+            <form id="buy-form">
+              <div class="form-grid single-column">
+                <label>
+                  Symbol
+                  <input id="buy-symbol" name="symbol" list="symbol-suggestions" autocomplete="off" required />
+                  <datalist id="symbol-suggestions"></datalist>
+                </label>
+                <label>
+                  Order Type
+                  <select id="buy-order-type" name="order_type">
+                    <option value="limit">limit</option>
+                    <option value="market">market</option>
+                  </select>
+                </label>
+                <label>
+                  Price (for limit)
+                  <input id="buy-price" name="price" value="0" />
+                </label>
+                <label>
+                  Volume
+                  <input id="buy-volume" name="volume" required />
+                </label>
+              </div>
+              <button type="submit">Place Buy</button>
+            </form>
+            <pre id="buy-result" class="result"></pre>
+          </section>
+
+          <section class="card">
+            <h2>Quick Actions</h2>
+            <div class="quick-actions">
+              <button id="refresh-watchlist" type="button">Watchlist</button>
+              <button id="refresh-outstanding" type="button">Outstanding</button>
+              <button id="refresh-tradelogs" type="button">Trade Logs</button>
+              <button id="refresh-activitylogs" type="button">Activity Logs</button>
+              <button id="refresh-positions" type="button">Positions</button>
+              <button id="refresh-summary" type="button">Account Summary</button>
+              <button id="refresh-topmovers" type="button">Top Movers</button>
+              <button id="refresh-indices" type="button">Indices</button>
+              <button id="refresh-consolidated" type="button">Consolidated Trades</button>
+              <button id="refresh-cash" type="button">Cash Balance</button>
+              <button id="refresh-withdrawals" type="button">Withdrawals</button>
+              <button id="refresh-statement" type="button">Statement</button>
+              <button id="refresh-exp-summary" type="button">Exp. Summary</button>
+              <button id="refresh-exp-cat" type="button">Exp. Category</button>
+              <a class="sidebar-link-btn" href="/ui/auto-trade.html">Auto Trading</a>
+              <a class="sidebar-link-btn" href="/ui/daily-trader.html">Daily Trader</a>
+            </div>
+          </section>
+        </aside>
+
+        <section class="content">
+          <!-- ── Account Summary ───────────────────────────────────── -->
+          <section class="card">
+            <div class="section-header">
+              <h2>Account Summary</h2>
+            </div>
+            <div id="account-summary-wrap" class="summary-grid"></div>
+          </section>
+
+          <!-- ── Watchlist ────────────────────────────────────────── -->
+          <section class="card">
+            <div class="section-header">
+              <h2>Watchlist</h2>
+            </div>
+            <div class="table-wrap">
+              <table id="watchlist-table">
+                <thead>
+                  <tr>
+                    <th>Symbol</th>
+                    <th>Last</th>
+                    <th>Bid</th>
+                    <th>Ask</th>
+                    <th>Change</th>
+                    <th>Volume</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- ── Open Positions ───────────────────────────────────── -->
+          <section class="card">
+            <div class="section-header">
+              <h2>Open Positions</h2>
+            </div>
+            <div class="table-wrap">
+              <table id="positions-table">
+                <thead>
+                  <tr>
+                    <th>Symbol</th>
+                    <th>Market</th>
+                    <th>Net Pos</th>
+                    <th>Mkt Rate</th>
+                    <th>Open Avg</th>
+                    <th>Open Vol</th>
+                    <th>Inventory</th>
+                    <th>Unreal MTM</th>
+                    <th>Realized P/L</th>
+                    <th>Total MTM</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- ── Top Movers ───────────────────────────────────────── -->
+          <section class="card">
+            <div class="section-header">
+              <h2>Top Movers</h2>
+              <div class="tab-group" id="movers-tabs">
+                <button class="tab-btn active" data-mode="1">Gainers</button>
+                <button class="tab-btn" data-mode="5">Losers</button>
+                <button class="tab-btn" data-mode="3">Top % Rise</button>
+                <button class="tab-btn" data-mode="2">Top Change</button>
+                <button class="tab-btn" data-mode="4">High Price</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table id="topmovers-table">
+                <thead>
+                  <tr>
+                    <th>Symbol</th>
+                    <th>Price</th>
+                    <th>Change</th>
+                    <th>Change %</th>
+                    <th>Volume</th>
+                    <th>Trades</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- ── Exchange State ───────────────────────────────────── -->
+          <section class="card">
+            <div class="section-header">
+              <h2>Exchange State</h2>
+            </div>
+            <div id="exchange-summary-wrap" class="summary-grid" style="margin-bottom:12px"></div>
+            <div class="table-wrap">
+              <table id="exchange-indices-table">
+                <thead>
+                  <tr>
+                    <th>Index</th>
+                    <th>Current</th>
+                    <th>High</th>
+                    <th>Low</th>
+                    <th>Net Change</th>
+                    <th>Volume</th>
+                    <th>Value</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- ── Market Summary (per segment) ────────────────────── -->
+          <section class="card">
+            <div class="section-header">
+              <h2>Market Segments</h2>
+            </div>
+            <div class="table-wrap">
+              <table id="indices-table">
+                <thead>
+                  <tr>
+                    <th>Market</th>
+                    <th>Status</th>
+                    <th>Trades</th>
+                    <th>Volume</th>
+                    <th>Value</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- ── Outstanding Orders ───────────────────────────────── -->
+          <section class="card">
+            <div class="section-header">
+              <h2>Outstanding Orders</h2>
+            </div>
+            <div class="table-wrap">
+              <table id="outstanding-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Symbol</th>
+                    <th>Market</th>
+                    <th>Side</th>
+                    <th>Type</th>
+                    <th>Ord Qty</th>
+                    <th>Filled</th>
+                    <th>Rem</th>
+                    <th>Price</th>
+                    <th>House ID</th>
+                    <th>Exch ID</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- ── Trade Logs (Today) ───────────────────────────────── -->
+          <section class="card">
+            <div class="section-header">
+              <h2>Trade Logs (Today)</h2>
+            </div>
+            <div class="table-wrap">
+              <table id="tradelogs-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Symbol</th>
+                    <th>Side</th>
+                    <th>Status</th>
+                    <th>Qty</th>
+                    <th>Price</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- ── Activity Logs (Today) ────────────────────────────── -->
+          <section class="card">
+            <div class="section-header">
+              <h2>Activity Logs (Today)</h2>
+            </div>
+            <div class="table-wrap">
+              <table id="activitylogs-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Symbol</th>
+                    <th>Side</th>
+                    <th>Status</th>
+                    <th>Ord Qty</th>
+                    <th>Filled</th>
+                    <th>Rem</th>
+                    <th>Price</th>
+                    <th>House ID</th>
+                    <th>Exch ID</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- ── Consolidated Trade Logs ──────────────────────────── -->
+          <section class="card">
+            <div class="section-header">
+              <h2>Consolidated Trades (All-time)</h2>
+            </div>
+            <div class="table-wrap">
+              <table id="consolidated-table">
+                <thead>
+                  <tr>
+                    <th>Symbol</th>
+                    <th>Market</th>
+                    <th>Buy Qty</th>
+                    <th>Buy Rate</th>
+                    <th>Buy Amt</th>
+                    <th>Sell Qty</th>
+                    <th>Sell Rate</th>
+                    <th>Sell Amt</th>
+                    <th>Net Qty</th>
+                    <th>Net Rate</th>
+                    <th>Net Amt</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+          <!-- ── Cash Balance ─────────────────────────────────────── -->
+          <section class="card">
+            <div class="section-header">
+              <h2>Cash Balance</h2>
+            </div>
+            <div id="cash-wrap" class="cash-display">
+              <span class="cash-label">Available Cash</span>
+              <span id="cash-value" class="cash-value">-</span>
+            </div>
+          </section>
+
+          <!-- ── Fund Withdrawals ─────────────────────────────────── -->
+          <section class="card">
+            <div class="section-header">
+              <h2>Withdrawals</h2>
+            </div>
+            <form id="withdrawal-form" class="inline-form">
+              <input id="wd-amount" type="number" placeholder="Amount" step="0.01" min="0" required />
+              <button type="submit" class="btn-primary">Request</button>
+            </form>
+            <div class="table-wrap" style="margin-top:10px">
+              <table id="withdrawals-table">
+                <thead>
+                  <tr>
+                    <th>Serial</th>
+                    <th>Date</th>
+                    <th>Amount</th>
+                    <th>Approved</th>
+                    <th>Method</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- ── Account Statement ────────────────────────────────── -->
+          <section class="card">
+            <div class="section-header">
+              <h2>Account Statement</h2>
+            </div>
+            <form id="statement-form" class="inline-form">
+              <label class="form-inline-label">From <input id="stmt-from" type="date" /></label>
+              <label class="form-inline-label">To <input id="stmt-to" type="date" /></label>
+              <button type="submit" class="btn-primary">Load</button>
+            </form>
+            <div class="table-wrap" style="margin-top:10px">
+              <table id="statement-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Debit</th>
+                    <th>Credit</th>
+                    <th>Balance</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- ── Scrip Lookup ─────────────────────────────────────── -->
+          <section class="card">
+            <div class="section-header">
+              <h2>Scrip Lookup</h2>
+            </div>
+            <form id="scrip-form" class="inline-form">
+              <input id="scrip-symbol" type="text" placeholder="Symbol (e.g. AHCL)" list="symbol-suggestions" autocomplete="off" required />
+              <select id="scrip-mkt-type">
+                <option value="REG">REG</option>
+                <option value="FUT">FUT</option>
+              </select>
+              <button type="submit" class="btn-primary">Lookup</button>
+            </form>
+            <div id="scrip-live-wrap" style="display:none;margin-top:12px">
+              <div id="scrip-live-grid" class="summary-grid"></div>
+              <h4 style="margin:12px 0 6px">Fundamentals</h4>
+              <div id="scrip-fund-grid" class="summary-grid"></div>
+              <h4 style="margin:12px 0 6px">
+                Periodic Data
+                <span class="tab-group" id="periodic-tabs" style="margin-left:10px">
+                  <button class="tab-btn active" data-dur="5DY">5D</button>
+                  <button class="tab-btn" data-dur="1MO">1M</button>
+                  <button class="tab-btn" data-dur="6MO">6M</button>
+                  <button class="tab-btn" data-dur="YTD">YTD</button>
+                  <button class="tab-btn" data-dur="1YR">1Y</button>
+                  <button class="tab-btn" data-dur="5YR">5Y</button>
+                </span>
+              </h4>
+              <div class="table-wrap">
+                <table id="periodic-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Low</th>
+                      <th>High</th>
+                      <th>Avg Price</th>
+                      <th>Low Vol</th>
+                      <th>High Vol</th>
+                      <th>Avg Vol</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- ── Exposure Summary by Category ────────────────────── -->
+          <section class="card">
+            <div class="section-header">
+              <h2>Exposure Summary</h2>
+            </div>
+            <div id="exp-summary-wrap" class="summary-grid"></div>
+          </section>
+
+          <!-- ── Exposure by Category ─────────────────────────────── -->
+          <section class="card">
+            <div class="section-header">
+              <h2>Exposure by Category</h2>
+              <div class="tab-group" id="exp-cat-tabs">
+                <button class="tab-btn active" data-mode="O">Open Positions</button>
+                <button class="tab-btn" data-mode="I">Collaterals</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table id="exp-cat-table">
+                <thead><tr id="exp-cat-header"></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+        </section>
+      </div>
+    </main>
+
+    <script src="/ui/app.js?v=9"></script>
+  </body>
+</html>

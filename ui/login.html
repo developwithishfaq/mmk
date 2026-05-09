@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MMK Login</title>
+    <link rel="stylesheet" href="/ui/styles.css?v=3" />
+    <meta http-equiv="Cache-Control" content="no-store" />
+  </head>
+  <body>
+    <main class="container login-container">
+      <section class="card login-card">
+        <h1>MMK Login</h1>
+        <form id="login-form">
+          <div class="form-grid single-column">
+            <label>
+              User ID
+              <input id="login-user-id" name="user_id" required />
+            </label>
+            <label>
+              Password
+              <input id="login-password" name="password" type="password" required />
+            </label>
+            <label>
+              PIN
+              <input id="login-pin" name="pin" required />
+            </label>
+          </div>
+          <button type="submit">Login</button>
+        </form>
+        <pre id="login-result" class="result"></pre>
+      </section>
+    </main>
+
+    <script src="/ui/login.js?v=3"></script>
+  </body>
+</html>

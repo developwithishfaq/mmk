@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MMK Auto Trading</title>
+    <link rel="stylesheet" href="/ui/styles.css?v=3" />
+    <meta http-equiv="Cache-Control" content="no-store" />
+  </head>
+  <body>
+    <main class="container">
+      <div class="section-header">
+        <h1>Auto Trading</h1>
+        <a href="/ui/index.html" class="text-link">&larr; Dashboard</a>
+      </div>
+      <p class="muted">
+        Strategies run independently per symbol on live ticks. State is persisted to
+        <code>auto_trade_state.json</code> by a background save thread (debounced).
+        Signals are a simple placeholder (last vs prev_close) — see
+        <code>auto_trade.compute_signal</code> to customize. Use <strong>Dry-run</strong>
+        to validate behavior without sending real orders, and <strong>Test tick</strong> to
+        force an evaluation while the market is closed.
+      </p>
+
+      <section class="card">
+        <h2>Add strategy</h2>
+        <form id="add-strategy-form" class="form-grid">
+          <label>
+            Symbol
+            <input id="at-symbol" required placeholder="e.g. HASCOL" />
+          </label>
+          <label>
+            Max spend / balance (PKR)
+            <input id="at-balance" type="number" step="any" value="1000" required />
+            <small class="muted">Hard cap: total cash deployed across entries will never exceed this.</small>
+          </label>
+          <label>
+            Risk / trade (decimal)
+            <input id="at-risk" type="number" step="0.001" value="0.02" required />
+          </label>
+          <label>
+            Order type
+            <select id="at-order-type">
+              <option value="market">market</option>
+              <option value="limit">limit</option>
+            </select>
+          </label>
+          <label>
+            Exit cooldown (sec)
+            <input id="at-cooldown" type="number" step="0.5" value="10" min="0" />
+          </label>
+          <label>
+            Warmup ticks
+            <input id="at-warmup" type="number" value="10" min="0" max="20" />
+          </label>
+          <label>
+            Max pyramids
+            <input id="at-pyramids" type="number" value="2" min="0" max="10" />
+          </label>
+          <label>
+            PIN (optional, else session PIN)
+            <input id="at-pin" type="password" autocomplete="off" />
+          </label>
+          <label class="checkbox-row">
+            <input id="at-enabled" type="checkbox" />
+            Enabled (start trading)
+          </label>
+          <label class="checkbox-row">
+            <input id="at-dry" type="checkbox" checked />
+            Dry-run (no real orders)
+          </label>
+          <button type="submit">Add strategy</button>
+        </form>
+        <pre id="at-form-msg" class="result"></pre>
+      </section>
+
+      <section class="card">
+        <div class="section-header">
+          <h2>Active strategies</h2>
+          <button id="at-refresh" type="button">Refresh</button>
+        </div>
+        <div id="at-strategies-list" class="strategies-list"></div>
+      </section>
+    </main>
+    <script src="/ui/auto-trade.js?v=3"></script>
+  </body>
+</html>
