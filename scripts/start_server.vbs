@@ -1,38 +1,37 @@
 ' start_server.vbs
-' ---------------------------------------------------------------
-' Silently starts the MMK Auto Trader server if it is not already
-' running. Designed to be called by Windows Task Scheduler on login.
-'
-' - Waits 90 seconds after login so the network is ready.
-' - Checks port 8000 before starting (idempotent).
-' - No window is shown at any point.
-' ---------------------------------------------------------------
+' Called by Windows Task Scheduler on login (via wscript.exe).
+' Waits 90s for network, then launches uvicorn hidden.
+' Activity written to logs\autostart.log for post-reboot review.
+' Pure ASCII - no Unicode chars - wscript.exe reads ANSI.
 
 Option Explicit
 
-Dim WshShell, oExec, sNetstat, sDir, sCmd
-
+Dim WshShell, oFSO
 Set WshShell = CreateObject("WScript.Shell")
+Set oFSO    = CreateObject("Scripting.FileSystemObject")
 
-' ── Wait for network to initialise after login ──────────────────
-WScript.Sleep 90000   ' 90 seconds
-
-' ── Check if server is already running on port 8000 ─────────────
-Set oExec  = WshShell.Exec("netstat -an")
-sNetstat   = oExec.StdOut.ReadAll()
-
-If InStr(sNetstat, ":8000 ") > 0 Then
-    ' Already running — nothing to do.
-    WScript.Quit 0
-End If
-
-' ── Launch uvicorn completely hidden ────────────────────────────
-' Full path to python.exe — Task Scheduler has a minimal PATH so
-' "python" alone is not found; the absolute path always works.
-Dim sPython
+Dim sPython, sDir, sLog
 sPython = "C:\Users\Muhammad Ishfaq\AppData\Local\Programs\Python\Python313\python.exe"
-sDir = "D:\Python Projects\2026 April\mmk-apis\api-mmk"
-sCmd = "cmd /c cd /d """ & sDir & """ && """ & sPython & """ -m uvicorn server:app --host 0.0.0.0 --port 8000"
+sDir    = "D:\Python Projects\2026 April\mmk-apis\api-mmk"
+sLog    = sDir & "\logs\autostart.log"
 
-' WindowStyle 0 = hidden, bWaitOnReturn False = fire-and-forget
-WshShell.Run sCmd, 0, False
+Sub LogLine(msg)
+    Dim fh
+    On Error Resume Next
+    Set fh = oFSO.OpenTextFile(sLog, 8, True)
+    If Err.Number = 0 Then
+        fh.WriteLine Now() & "  " & msg
+        fh.Close
+    End If
+    On Error GoTo 0
+End Sub
+
+' Wait for network to come up after login
+LogLine "Autostart triggered - waiting 90s for network..."
+WScript.Sleep 90000
+
+' Launch uvicorn hidden (window style 0 = hidden, False = don't wait)
+LogLine "Launching server..."
+WshShell.CurrentDirectory = sDir
+WshShell.Run """" & sPython & """ -m uvicorn server:app --host 0.0.0.0 --port 8000", 0, False
+LogLine "Server process started. See logs\trader.log for details."
