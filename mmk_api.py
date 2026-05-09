@@ -1103,6 +1103,61 @@ def get_market_status(session: Session) -> dict:
 
 
 # ══════════════════════════════════════════════════════════════════
+# CIRCUIT-BREAKER LIMITS
+# ══════════════════════════════════════════════════════════════════
+
+def get_cap_limits(session: Session) -> dict[str, dict]:
+    """
+    Fetch upper/lower price circuit-breaker limits for all symbols.
+
+    Returns a dict keyed by "MARKET_SYMBOL" (e.g. "01_OGDC"):
+      { "upper": <float>, "lower": <float> }
+
+    Use before placing any order to validate price is within circuit.
+    An order outside these bounds will be silently rejected by the exchange.
+    """
+    resp = requests.get(
+        f"{BASE_URL}/api_new/getCapLock",
+        headers=_headers(session),
+        params={"v": "1"},
+        timeout=30,
+        verify=False,
+    )
+    body = resp.json()
+    if not isinstance(body, dict):
+        return {}
+    adata = body.get("aData", {})
+    if not isinstance(adata, dict):
+        return {}
+    headers_row = adata.get("aHeader", [])
+    rows        = adata.get("aData",   [])
+    if not isinstance(headers_row, list) or not isinstance(rows, list):
+        return {}
+
+    # Build column-name → index map
+    col = {str(h).upper(): i for i, h in enumerate(headers_row)}
+    sym_i    = col.get("SYMBOL_CODE",  col.get("SYMBOL", -1))
+    mkt_i    = col.get("MARKET_CODE",  col.get("MARKET", -1))
+    upper_i  = col.get("UVAL", -1)
+    lower_i  = col.get("LVAL", -1)
+
+    result: dict[str, dict] = {}
+    for row in rows:
+        if not isinstance(row, list):
+            continue
+        try:
+            sym    = str(row[sym_i]).strip()   if sym_i   >= 0 else ""
+            mkt    = str(row[mkt_i]).strip()   if mkt_i   >= 0 else "01"
+            upper  = float(row[upper_i])       if upper_i >= 0 else 0.0
+            lower  = float(row[lower_i])       if lower_i >= 0 else 0.0
+        except (IndexError, TypeError, ValueError):
+            continue
+        if sym:
+            result[f"{mkt}_{sym}"] = {"upper": upper, "lower": lower}
+    return result
+
+
+# ══════════════════════════════════════════════════════════════════
 # NOTIFICATIONS
 # ══════════════════════════════════════════════════════════════════
 

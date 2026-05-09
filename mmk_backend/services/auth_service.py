@@ -25,6 +25,7 @@ import json
 import logging
 import os
 import secrets
+import threading
 import time
 
 from fastapi import Request
@@ -33,6 +34,7 @@ import auto_trade
 from mmk_api import (
     connect_all_sockets,
     disconnect_all_sockets,
+    get_cap_limits,
     get_symbol_list,
     get_watchlist,
     login,
@@ -131,11 +133,27 @@ def try_auto_login_from_disk() -> bool:
             with runtime.symbols_lock:
                 runtime.symbols.clear()
                 runtime.symbols.extend(symbols)
+        # Fetch circuit limits in background — non-blocking, best-effort.
+        _refresh_cap_limits_async(runtime.session)
         log.info(f"Auto-login restored for user {user_id}.")
         return True
     except Exception as e:
         log.warning(f"Auto-login restore failed: {e}")
         return False
+
+
+def _refresh_cap_limits_async(session) -> None:
+    """Fetch circuit-breaker limits in a background thread (non-blocking)."""
+    def _run():
+        try:
+            limits = get_cap_limits(session)
+            with runtime.cap_limits_lock:
+                runtime.cap_limits.clear()
+                runtime.cap_limits.update(limits)
+            log.info(f"Circuit limits loaded: {len(limits)} symbols")
+        except Exception as e:
+            log.warning(f"Cap limits fetch failed: {e}")
+    threading.Thread(target=_run, name="cap-limits-fetch", daemon=True).start()
 
 
 def refresh_subscriptions() -> None:

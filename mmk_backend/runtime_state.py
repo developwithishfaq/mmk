@@ -37,6 +37,15 @@ class RuntimeState:
         "symbols_lock",
         "broker_view",
         "broker_view_lock",
+        # Live market status from `ht` socket message ("OPENED", "CLOSED", etc.)
+        # Updated in real-time by socket_handler; faster than REST polling.
+        "market_status",
+        # True once feed manager confirms it is connected (`hf` message d=="1").
+        "feed_alive",
+        # Circuit-breaker limits: key = "MARKET_SYMBOL" (e.g. "01_OGDC"),
+        # value = {"upper": float, "lower": float}.  Fetched on login.
+        "cap_limits",
+        "cap_limits_lock",
     )
 
     def __init__(self, settings: Settings | None = None) -> None:
@@ -63,6 +72,11 @@ class RuntimeState:
 
         self.broker_view: Optional["BrokerView"] = None
         self.broker_view_lock = threading.Lock()
+
+        self.market_status: str = "UNKNOWN"
+        self.feed_alive: bool = False
+        self.cap_limits: dict[str, dict] = {}
+        self.cap_limits_lock = threading.Lock()
 
 
 _runtime_lock = threading.Lock()

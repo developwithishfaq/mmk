@@ -106,6 +106,18 @@ def dt_broker_has_any_today(symbol: str) -> bool:
 
 
 def dt_broker_market_open() -> bool:
+    """
+    Return True if the market is open for trading.
+
+    Priority:
+    1. Live socket `ht` message in runtime.market_status — instant, no REST call.
+    2. BrokerView REST fallback (30s TTL) — used if socket hasn't received ht yet.
+    """
+    from mmk_backend.services.socket_handler import _OPEN_STATUSES  # noqa: PLC0415
+    status = runtime.market_status
+    if status != "UNKNOWN":
+        return status in _OPEN_STATUSES
+    # Fallback: poll REST if socket hasn't delivered ht yet
     try:
         return bool(get_broker_view().is_market_open())
     except Exception as e:
@@ -143,9 +155,33 @@ def dt_track_order(ord_hash: str, symbol: str, side: str) -> None:
         }
 
 
+def _check_cap_limits(symbol: str, price: float, side: str) -> None:
+    """
+    Raise ValueError if `price` is outside the exchange circuit-breaker limits.
+    Key format: "MARKET_SYMBOL" (e.g. "01_OGDC").  Uses MARKET_REG ("01").
+    Silently skips if limits are not yet loaded for this symbol.
+    """
+    key = f"{MARKET_REG}_{symbol.upper()}"
+    with runtime.cap_limits_lock:
+        limits = runtime.cap_limits.get(key)
+    if not limits:
+        return  # limits not loaded yet — don't block the order
+    upper = limits.get("upper", 0.0)
+    lower = limits.get("lower", 0.0)
+    if upper > 0 and price > upper:
+        raise ValueError(
+            f"Order price {price} exceeds upper circuit limit {upper} for {symbol}"
+        )
+    if lower > 0 and price < lower:
+        raise ValueError(
+            f"Order price {price} below lower circuit limit {lower} for {symbol}"
+        )
+
+
 def dt_place_limit_buy(symbol: str, price: float, qty: int) -> str:
     if runtime.sockets is None or runtime.session is None:
         raise WebSocketConnectionClosedException("not connected")
+    _check_cap_limits(symbol, price, "buy")
     ord_hash = place_limit_buy(
         runtime.sockets, runtime.session, symbol, str(price), str(int(qty)), runtime.pin,
     )
@@ -156,6 +192,7 @@ def dt_place_limit_buy(symbol: str, price: float, qty: int) -> str:
 def dt_place_limit_sell(symbol: str, price: float, qty: int) -> str:
     if runtime.sockets is None or runtime.session is None:
         raise WebSocketConnectionClosedException("not connected")
+    _check_cap_limits(symbol, price, "sell")
     ord_hash = place_limit_sell(
         runtime.sockets, runtime.session, symbol, str(price), str(int(qty)), runtime.pin,
     )

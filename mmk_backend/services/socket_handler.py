@@ -26,8 +26,12 @@ log = logging.getLogger("mmk.socket")
 
 CSV_FIELDS = [
     "symbol", "market", "last", "bid", "ask",
+    "bid_vol", "ask_vol",
     "high", "low", "change", "volume", "prev_close",
 ]
+
+# Market status values from `ht` messages that mean "open for trading".
+_OPEN_STATUSES = {"OPENED", "OPEN", "OHO"}  # OHO = off-hour orders (limit only)
 
 
 # ── Internal helpers ────────────────────────────────────────────────────────
@@ -50,6 +54,8 @@ def _parse_price_row(row: list) -> dict | None:
         "last":       str(row[8]),
         "bid":        str(row[5]),
         "ask":        str(row[6]),
+        "bid_vol":    str(row[4])  if len(row) > 4  else "",   # best bid volume
+        "ask_vol":    str(row[7])  if len(row) > 7  else "",   # best ask volume
         "high":       str(row[14]),
         "low":        str(row[15]),
         "change":     str(row[16]),
@@ -200,6 +206,26 @@ def on_message(name: str, raw: str, parsed: dict) -> None:  # noqa: C901
         )
 
     # ── cr: cancel acknowledgement ──────────────────────────────────────────
+    # ── ht: live market status from exchange ────────────────────────────────
+    elif t == "ht":
+        status = str(parsed.get("d") or "").upper().strip()
+        runtime.market_status = status
+        if status in _OPEN_STATUSES:
+            log.info(f"[HT] Market OPENED  (status={status!r})")
+        else:
+            log.info(f"[HT] Market status → {status!r}")
+
+    # ── hf: feed manager status ─────────────────────────────────────────────
+    elif t == "hf":
+        d = parsed.get("d")
+        alive = (str(d) == "1")
+        if alive != runtime.feed_alive:
+            runtime.feed_alive = alive
+            if alive:
+                log.info("[HF] Market feed manager connected")
+            else:
+                log.warning("[HF] Market feed manager disconnected")
+
     elif t == "cr":
         log.info(f"[CR] Cancel ack  {parsed.get('d')}")
 
