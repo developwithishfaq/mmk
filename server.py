@@ -23,7 +23,6 @@ from mmk_backend.routers import auto_trade as at_router
 from mmk_backend.runtime_state import configure_runtime, runtime
 from mmk_backend.services import auth_service
 from mmk_backend.settings import LOG_DIR
-from mmk_backend.watchdog import start_watchdog, stop_watchdog
 from mmk_api import disconnect_all_sockets
 
 # ── Logging ─────────────────────────────────────────────────────────────────
@@ -64,9 +63,7 @@ daily_trader.get().init()
 async def lifespan(app: FastAPI):
     auth_service.restore_web_sessions_from_disk()
     auth_service.try_auto_login_from_disk()
-    start_watchdog()   # monitors broker connection; reconnects + resumes bot on drop
     yield
-    stop_watchdog()
     if runtime.sockets:
         try:
             disconnect_all_sockets(runtime.sockets)
