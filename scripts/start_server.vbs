@@ -27,8 +27,12 @@ If InStr(sNetstat, ":8000 ") > 0 Then
 End If
 
 ' ── Launch uvicorn completely hidden ────────────────────────────
+' Full path to python.exe — Task Scheduler has a minimal PATH so
+' "python" alone is not found; the absolute path always works.
+Dim sPython
+sPython = "C:\Users\Muhammad Ishfaq\AppData\Local\Programs\Python\Python313\python.exe"
 sDir = "D:\Python Projects\2026 April\mmk-apis\api-mmk"
-sCmd = "cmd /c cd /d """ & sDir & """ && python -m uvicorn server:app --host 0.0.0.0 --port 8000"
+sCmd = "cmd /c cd /d """ & sDir & """ && """ & sPython & """ -m uvicorn server:app --host 0.0.0.0 --port 8000"
 
 ' WindowStyle 0 = hidden, bWaitOnReturn False = fire-and-forget
 WshShell.Run sCmd, 0, False
