@@ -15,17 +15,9 @@ echo  The server starts 90 seconds after login (giving Windows
 echo  time to connect to the internet first).
 echo.
 
-:: ── Install the scheduled task ────────────────────────────────────
-:: Uses wscript.exe to run the VBScript silently (no CMD window).
-:: %~dp0 = full path to THIS bat file's directory (the scripts\ folder).
-:: "" around the path handle spaces in folder names.
-
-schtasks /create ^
-  /tn "MMK Auto Trader" ^
-  /tr "wscript.exe ""%~dp0start_server.vbs""" ^
-  /sc onlogon ^
-  /rl highest ^
-  /f
+:: ── Use PowerShell to create the task (handles spaces in paths) ───
+:: [char]34 = double-quote character, avoids quoting nightmares.
+powershell -ExecutionPolicy Bypass -Command "$vbs = 'D:\Python Projects\2026 April\mmk-apis\api-mmk\scripts\start_server.vbs'; $arg = [char]34 + $vbs + [char]34; $a = New-ScheduledTaskAction -Execute 'wscript.exe' -Argument $arg; $t = New-ScheduledTaskTrigger -AtLogon; Register-ScheduledTask -TaskName 'MMK Auto Trader' -Action $a -Trigger $t -RunLevel Highest -Force -Description 'Starts MMK Auto Trader server 90s after Windows login'"
 
 if %errorlevel% == 0 (
     echo.
@@ -33,14 +25,14 @@ if %errorlevel% == 0 (
     echo   SUCCESS!
     echo   The server will now start automatically on every login.
     echo.
-    echo   To remove autostart later:
+    echo   To remove autostart later, run:
     echo     schtasks /delete /tn "MMK Auto Trader" /f
-    echo   Or: open Task Scheduler and delete "MMK Auto Trader"
+    echo   Or open Task Scheduler and delete "MMK Auto Trader"
     echo  ============================================================
 ) else (
     echo.
     echo  ============================================================
-    echo   FAILED. Try right-clicking this file and choosing
+    echo   FAILED. Right-click this file, choose
     echo   "Run as administrator", then try again.
     echo  ============================================================
 )
