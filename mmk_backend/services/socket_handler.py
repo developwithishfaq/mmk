@@ -61,6 +61,9 @@ def _parse_price_row(row: list) -> dict | None:
 # ── Public dispatcher ───────────────────────────────────────────────────────
 
 def on_message(name: str, raw: str, parsed: dict) -> None:  # noqa: C901
+    # Stamp every frame so the watchdog can detect a dead connection.
+    runtime.last_message_ts = time.time()
+
     t = parsed.get("t")
 
     # ── od: order delivered to exchange ────────────────────────────────────

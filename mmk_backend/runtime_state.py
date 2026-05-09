@@ -37,6 +37,10 @@ class RuntimeState:
         "symbols_lock",
         "broker_view",
         "broker_view_lock",
+        # Timestamp of the last frame received from any broker WebSocket.
+        # Updated by socket_handler on every message; read by the watchdog
+        # to detect dead connections.  0.0 means "not yet connected".
+        "last_message_ts",
     )
 
     def __init__(self, settings: Settings | None = None) -> None:
@@ -63,6 +67,8 @@ class RuntimeState:
 
         self.broker_view: Optional["BrokerView"] = None
         self.broker_view_lock = threading.Lock()
+
+        self.last_message_ts: float = 0.0
 
 
 _runtime_lock = threading.Lock()
