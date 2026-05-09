@@ -1183,25 +1183,31 @@ def get_notifications(session: Session) -> list[dict]:
 
 def get_available_cash(session: Session, pin: str = "") -> dict:
     """
-    Fetch available cash balance.
+    Fetch available cash balance from getclientexposure → aBuyPowerAd.
 
-    Returns: { "available_cash": <float>, "raw": <str> }
+    Note: /api_new/getavailablecash is the *cash withdrawal* endpoint and is
+    time-restricted (only open during market hours).  The actual cash balance
+    lives in the exposure endpoint which is always available.
+
+    Returns:
+      {
+        "available_cash":  <float>,   # pCashAmt  — cash available for trading
+        "total_cash":      <float>,   # pTotCash  — total cash (= available when unused)
+        "collateral":      <float>,   # pCdcAmt   — CDC / collateral value
+        "cash_utilized":   <float>,   # pCashUtil — cash already committed
+        "col_utilized":    <float>,   # pColUtil  — collateral already committed
+      }
     """
-    resp = requests.post(
-        f"{BASE_URL}/api_new/getavailablecash",
-        headers=_headers(session),
-        data={"account": session.user_id, "pin": pin},
-        timeout=30,
-        verify=False,
-    )
-    body = resp.json()
-    if not body.get("success"):
-        return {"available_cash": None, "message": body.get("message")}
-    adata = body.get("aData", {})
-    raw = adata.get("availableCash") if isinstance(adata, dict) else None
+    data = _get_client_exposure_raw(session)
+    bp = data.get("aBuyPowerAd") if isinstance(data, dict) else None
+    if not isinstance(bp, dict):
+        return {"available_cash": None}
     return {
-        "available_cash": _safe_float(raw),
-        "raw":            str(raw) if raw is not None else None,
+        "available_cash": _safe_float(bp.get("pCashAmt")),
+        "total_cash":     _safe_float(bp.get("pTotCash")),
+        "collateral":     _safe_float(bp.get("pCdcAmt")),
+        "cash_utilized":  _safe_float(bp.get("pCashUtil")),
+        "col_utilized":   _safe_float(bp.get("pColUtil")),
     }
 
 
