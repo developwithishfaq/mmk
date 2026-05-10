@@ -3,20 +3,9 @@
 ## Wiki First
 
 **Before writing any code or answering any question about the broker API, market rules, order
-flow, or bot architecture — read the relevant wiki page(s) first.**
+flow, or bot architecture — consult the wiki first.**
 
-```
-wiki/index.md          ← start here, find the right page
-wiki/broker_api.md     ← all REST endpoints + response shapes
-wiki/socket_messages.md← every WebSocket message type
-wiki/fix_protocol.md   ← FIX tag reference, order status codes
-wiki/order_flow.md     ← place / cancel / modify payloads, ordHash
-wiki/market_rules.md   ← PSX hours, session phases, order restrictions
-wiki/circuit_limits.md ← upper/lower price bands per symbol
-wiki/authentication.md ← login flow, session tokens, socket setup
-wiki/daily_trader.md   ← DailyTrader state machine, Config, VWAP
-wiki/known_issues.md   ← bugs fixed, gotchas, things that will bite you
-```
+Start at `wiki/index.md` to find the relevant page(s), then read them before proceeding.
 
 After answering or making changes, update the relevant wiki page if new facts were discovered.
 Append an entry to `wiki/log.md`.
