@@ -1,5 +1,35 @@
 # MMK Trading Bot — Project Rules
 
+## How This Project Is Operated
+
+**This project is controlled by Claude Code through chat, not by the user clicking a web UI.**
+That is the user's explicit preference. In every session in this repo, treat yourself as the
+operations console for the bot.
+
+You run the show. The user will say things like *"start the server"*, *"start the trader"*,
+*"what's the status"*, *"any trades today"*, *"stop trader"*, *"tail the logs"*, *"change target
+to 4%"* — and you execute them via the FastAPI endpoints below (server is on
+`http://127.0.0.1:8000`). Don't redirect them to the web UI. Don't ask them to run uvicorn
+themselves. Don't ask them to paste credentials — they live in `.env.local` (gitignored) and
+`scripts/serve.ps1` loads them.
+
+**Read-only — just run, then summarize compactly:**
+`/daily-trader/status`, `/positions`, `/trades`, `/signals`, `/events`, `/account/*`, `/market/*`,
+log tailing (last 10–20 lines of `logs/trader.log`).
+
+**State-changing — confirm with the user before calling:**
+- Starting/stopping the server (`.\scripts\serve.ps1`, killing uvicorn)
+- `POST /daily-trader/start` / `/stop` / `/halt` / `/reset-day` / `/close`
+- `PATCH /daily-trader/config` (any config change while live)
+- `POST /order/place` / `/cancel` / `/change` / `/place-slo`
+- Any `/account/withdrawal*` endpoint
+
+**Response style:** compact state + key numbers by default. Raw JSON only on request. Tail logs
+in short slices, never dump the whole file. If you don't know whether the server is up, probe
+`/daily-trader/status` before assuming.
+
+---
+
 ## Wiki First
 
 **Before writing any code or answering any question about the broker API, market rules, order
@@ -37,11 +67,18 @@ daily_trader_state.json          ← Bot state persistence (auto-written)
 
 ## Running the Server
 
+Preferred (loads credentials from `.env.local`):
+```powershell
+.\scripts\serve.ps1
+```
+
+Manual fallback (env vars must already be set in the shell):
 ```bash
 uvicorn server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Server must be started manually — all autostart scripts have been removed.
+Server must be started manually (no autostart). You — Claude — start it on request, in the
+background, then verify with `GET /daily-trader/status`.
 
 ---
 

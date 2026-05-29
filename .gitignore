@@ -25,3 +25,7 @@ api_hits.jsonl
 *.tmp
 mmk-decompiled-apk/
 TRADING_BOT_API_KEYS_REFERENCE.txt
+
+# Local credentials — never commit
+.env.local
+.env
