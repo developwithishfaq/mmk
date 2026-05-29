@@ -78,12 +78,20 @@ def dt_fetch_feed(feed_type: str, code: str) -> list[dict]:
         return []
 
 
+_last_reported_cash: float = -1.0
+
+
 def dt_get_cash() -> float:
     """Cached cash via BrokerView (30 s TTL); avoids hitting REST every tick."""
+    global _last_reported_cash
     try:
-        return float(get_broker_view().cash() or 0.0)
+        cash = float(get_broker_view().cash() or 0.0)
+        if abs(cash - _last_reported_cash) >= 0.01:
+            log.info(f"[DT] cash available: {cash:.2f} PKR")
+            _last_reported_cash = cash
+        return cash
     except Exception as e:
-        log.warning(f"daily_trader cash fetch failed: {e}")
+        log.warning(f"[DT] cash fetch failed: {e}")
         return 0.0
 
 
@@ -186,6 +194,7 @@ def dt_place_limit_buy(symbol: str, price: float, qty: int) -> str:
         runtime.sockets, runtime.session, symbol, str(price), str(int(qty)), runtime.pin,
     )
     dt_track_order(ord_hash, symbol, "buy")
+    log.info(f"[DT] LIMIT BUY sent  {symbol}  qty={qty}  price={price}  ordHash={ord_hash}")
     return ord_hash
 
 
@@ -197,6 +206,7 @@ def dt_place_limit_sell(symbol: str, price: float, qty: int) -> str:
         runtime.sockets, runtime.session, symbol, str(price), str(int(qty)), runtime.pin,
     )
     dt_track_order(ord_hash, symbol, "sell")
+    log.info(f"[DT] LIMIT SELL sent  {symbol}  qty={qty}  price={price}  ordHash={ord_hash}")
     return ord_hash
 
 
@@ -207,18 +217,21 @@ def dt_place_market_sell(symbol: str, qty: int) -> str:
         runtime.sockets, runtime.session, symbol, str(int(qty)), runtime.pin,
     )
     dt_track_order(ord_hash, symbol, "sell")
+    log.info(f"[DT] MARKET SELL sent  {symbol}  qty={qty}  ordHash={ord_hash}")
     return ord_hash
 
 
 def dt_cancel_order(ord_hash: str) -> bool:
     """Look up exch/house IDs from the runtime cache, then cancel."""
     if runtime.sockets is None or runtime.session is None:
+        log.warning(f"[DT] cancel skipped — not connected  ordHash={ord_hash}")
         return False
     with runtime.orders_lock:
         o = dict(runtime.orders.get(ord_hash, {}))
     exch  = o.get("exch_order_id")  or ""
     house = o.get("house_order_id") or ""
     if not exch or not house:
+        log.warning(f"[DT] cancel waiting for pm report  ordHash={ord_hash}  sym={o.get('symbol')}")
         return False
     sym  = o.get("symbol") or ""
     side = o.get("side_num") or ("1" if o.get("side") == "buy" else "2")
@@ -227,9 +240,10 @@ def dt_cancel_order(ord_hash: str) -> bool:
             runtime.sockets, runtime.session,
             sym, exch, house, side, MARKET_REG, runtime.pin,
         )
+        log.info(f"[DT] CANCEL sent  {sym}  exch={exch}  house={house}  ordHash={ord_hash}")
         return True
     except Exception as e:
-        log.warning(f"daily_trader cancel failed: {e}")
+        log.warning(f"[DT] cancel failed  {sym}  ordHash={ord_hash}  err={e}")
         return False
 
 
@@ -247,6 +261,7 @@ def dt_place_slo(symbol: str, qty: int, trigger_price: float, stop_price: float)
         pin=runtime.pin,
     )
     dt_track_order(ord_hash, symbol, "sell")
+    log.info(f"[DT] SLO sent  {symbol}  qty={qty}  trigger={trigger_price}  stop={stop_price}  ordHash={ord_hash}")
     return ord_hash
 
 

@@ -104,11 +104,12 @@ class BrokerView:
         try:
             rows = get_outstanding_orders(s) or []
         except Exception as e:
-            log.warning(f"refresh_outstanding failed: {e}")
+            log.warning(f"[API FAIL] get_outstanding_orders: {e}")
             return
         with self._lock:
             self._outstanding = rows if isinstance(rows, list) else []
             self._outstanding_ts = time.time()
+        log.info(f"[API OK] get_outstanding_orders: {len(self._outstanding)} orders")
 
     def _refresh_activity(self) -> None:
         s = self._session()
@@ -117,11 +118,12 @@ class BrokerView:
         try:
             rows = get_activity_logs(s) or []
         except Exception as e:
-            log.warning(f"refresh_activity failed: {e}")
+            log.warning(f"[API FAIL] get_activity_logs: {e}")
             return
         with self._lock:
             self._activity = rows if isinstance(rows, list) else []
             self._activity_ts = time.time()
+        log.info(f"[API OK] get_activity_logs: {len(self._activity)} rows")
 
     def _refresh_positions(self) -> None:
         s = self._session()
@@ -130,11 +132,13 @@ class BrokerView:
         try:
             rows = get_open_positions(s) or []
         except Exception as e:
-            log.warning(f"refresh_positions failed: {e}")
+            log.warning(f"[API FAIL] get_open_positions: {e}")
             return
         with self._lock:
             self._positions = rows if isinstance(rows, list) else []
             self._positions_ts = time.time()
+        syms = [r.get("symbol", "?") for r in self._positions]
+        log.info(f"[API OK] get_open_positions: {len(self._positions)} positions  {syms}")
 
     def _refresh_cash(self) -> None:
         s = self._session()
@@ -144,11 +148,12 @@ class BrokerView:
             data = get_available_cash(s, pin=self._pin())
             cash = data.get("available_cash") if isinstance(data, dict) else None
         except Exception as e:
-            log.warning(f"refresh_cash failed: {e}")
+            log.warning(f"[API FAIL] get_available_cash: {e}")
             return
         with self._lock:
             self._cash = float(cash or 0.0)
             self._cash_ts = time.time()
+        log.info(f"[API OK] get_available_cash: {self._cash:.2f} PKR")
 
     def _refresh_market(self) -> None:
         s = self._session()
@@ -158,11 +163,12 @@ class BrokerView:
             data = get_market_status(s)
             label = data.get("status") if isinstance(data, dict) else None
         except Exception as e:
-            log.warning(f"refresh_market failed: {e}")
+            log.warning(f"[API FAIL] get_market_status: {e}")
             return
         with self._lock:
             self._market_status = (label or "UNKNOWN").upper()
             self._market_status_ts = time.time()
+        log.info(f"[API OK] get_market_status: {self._market_status}")
 
     def _maybe_refresh(self, kind: str) -> None:
         now = time.time()
@@ -296,7 +302,10 @@ class BrokerView:
             return self._market_status
 
     def is_market_open(self) -> bool:
-        return self.market_status() == "OPEN"
+        # Broker REST returns "OPENED" (with a D); socket `ht` may also send "OPEN" or "OHO".
+        # Mirror socket_handler._OPEN_STATUSES so REST and socket paths agree.
+        from mmk_backend.services.socket_handler import _OPEN_STATUSES
+        return self.market_status() in _OPEN_STATUSES
 
     def refresh(self) -> dict:
         """Force-refresh every cache (used by manual Sync from Broker button)."""

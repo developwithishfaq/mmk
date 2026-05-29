@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import time
 import threading
 import datetime
@@ -17,6 +18,8 @@ import urllib3
 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+log = logging.getLogger("mmk.api")
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -195,7 +198,7 @@ class TradingSocket:
             self._ws.close()
 
     def _on_open(self, ws):
-        print(f"[{self.name}] Connected")
+        log.info(f"[{self.name}] Connected")
         self._stop_ping.clear()
         threading.Thread(target=self._ping_loop, daemon=True).start()
 
@@ -208,11 +211,11 @@ class TradingSocket:
             self._on_msg_cb(self.name, raw, parsed)
 
     def _on_error(self, ws, error):
-        print(f"[{self.name}] Error: {error} - goodbye")
+        log.error(f"[{self.name}] WebSocket error: {error}")
 
     def _on_close(self, ws, code, msg):
         self._stop_ping.set()
-        print(f"[{self.name}] Closed (code={code})")
+        log.warning(f"[{self.name}] WebSocket closed (code={code})")
 
     def _ping_loop(self):
         while not self._stop_ping.wait(self.ping_sec):
@@ -225,6 +228,7 @@ class TradingSocket:
 
 def connect_all_sockets(session: Session, on_message=None,
                         wait_sec=3.0) -> SocketSet:
+    log.info(f"Connecting sockets for user {session.user_id} (op={session.op})")
     sockets = []
     pm = mf = None
 
@@ -593,6 +597,7 @@ def place_limit_buy(socket_set, session, symbol, price, volume, pin,
     payload = _build_order(session.user_id, volume, ORDER_TYPE_LIMIT, price,
                            SIDE_BUY, symbol, H_SIDE_BUY, market_type, pin, md5)
     socket_set.pm.send('[9,{"key":"pushOrder","val":' + payload + "}]")
+    log.info(f"[ORDER] LIMIT BUY  {symbol}  qty={volume}  price={price}  ordHash={md5}")
     return md5
 
 
@@ -602,6 +607,7 @@ def place_limit_sell(socket_set, session, symbol, price, volume, pin,
     payload = _build_order(session.user_id, volume, ORDER_TYPE_LIMIT, price,
                            SIDE_SELL, symbol, H_SIDE_SELL, market_type, pin, md5)
     socket_set.pm.send('[9,{"key":"pushOrder","val":' + payload + "}]")
+    log.info(f"[ORDER] LIMIT SELL  {symbol}  qty={volume}  price={price}  ordHash={md5}")
     return md5
 
 
@@ -611,6 +617,7 @@ def place_market_buy(socket_set, session, symbol, volume, pin,
     payload = _build_order(session.user_id, volume, ORDER_TYPE_MARKET, "0",
                            SIDE_BUY, symbol, H_SIDE_BUY, market_type, pin, md5)
     socket_set.pm.send('[9,{"key":"pushOrder","val":' + payload + "}]")
+    log.info(f"[ORDER] MARKET BUY  {symbol}  qty={volume}  ordHash={md5}")
     return md5
 
 
@@ -620,6 +627,7 @@ def place_market_sell(socket_set, session, symbol, volume, pin,
     payload = _build_order(session.user_id, volume, ORDER_TYPE_MARKET, "0",
                            SIDE_SELL, symbol, H_SIDE_SELL, market_type, pin, md5)
     socket_set.pm.send('[9,{"key":"pushOrder","val":' + payload + "}]")
+    log.info(f"[ORDER] MARKET SELL  {symbol}  qty={volume}  ordHash={md5}")
     return md5
 
 
@@ -675,6 +683,7 @@ def cancel_order(
         separators=(",", ":"),
     )
     socket_set.pm.send('[9,{"key":"cancelOrder","val":' + payload + "}]")
+    log.info(f"[ORDER] CANCEL  {symbol}  side={order_side}  exch={exch_order_id}  house={house_order_id}  ordHash={md5}")
     return md5
 
 
@@ -1888,4 +1897,5 @@ def place_slo_order(
         separators=(",", ":"),
     )
     socket_set.mf.send('[9,{"key":"pushSLO","val":' + payload + "}]")
+    log.info(f"[ORDER] SLO  {symbol}  side={side}  qty={volume}  trigger={trigger_price}  stop={stop_price}  ordHash={md5}")
     return md5
