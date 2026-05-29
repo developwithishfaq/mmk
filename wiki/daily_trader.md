@@ -1,7 +1,7 @@
 # Daily Trader
 
-**Last updated:** 2026-05-10
-**Related:** [market_rules.md](market_rules.md), [circuit_limits.md](circuit_limits.md), [order_flow.md](order_flow.md), [broker_api.md](broker_api.md)
+**Last updated:** 2026-05-29
+**Related:** [market_rules.md](market_rules.md), [circuit_limits.md](circuit_limits.md), [order_flow.md](order_flow.md), [broker_api.md](broker_api.md), [reliability.md](reliability.md)
 
 Intraday momentum bot. File: `daily_trader.py` (root). Hooks wired in
 `mmk_backend/services/daily_trader_hooks.py`.
@@ -44,10 +44,12 @@ Strategy parameters. Can be patched at runtime via `PATCH /daily-trader/config`.
 
 | Field | Default | Meaning |
 |-------|---------|---------|
-| `risk_per_trade_pct` | `2.0` | % of available cash at risk per trade |
-| `stop_pct` | `1.0` | Stop distance from entry (%) — denominator in position size formula |
-| `max_buy_amount_per_trade` | `1000` | Hard cap per trade (PKR) |
-| `daily_max_buy_amount` | `10000` | Hard cap total for the day (PKR) |
+| `risk_per_trade_pct` | `2.0` | % of available cash at risk per trade (Kelly formula input) |
+| `stop_pct` | `1.0` | Stop distance from entry (%) — denominator in Kelly formula |
+| `max_buy_amount_per_trade` | `1000` | Hard PKR cap per trade |
+| `daily_max_buy_amount` | `10000` | Hard PKR cap total for the day |
+| `min_trade_notional` | `300` | Skip entry if per-slot budget falls below this (PKR) |
+| `min_cap_room_pct` | `1.0` | Reject signals within this % of upper circuit limit (0 disables) |
 
 **Target / exits:**
 
@@ -92,10 +94,12 @@ All broker I/O goes through this bundle, making the bot testable without a live 
 | `place_market_sell` | `(symbol, qty, ord_hash) → str` | Force exit |
 | `cancel_order` | `(ord_hash) → bool` | Requires pm report received first |
 | `place_slo` | `(symbol, qty, stop_price, ord_hash) → str` | MF socket |
-| `broker_has_any_today` | `() → bool` | Broker order history check |
+| `broker_has_any_today` | `(symbol) → bool` | Broker order history check |
 | `broker_market_open` | `() → bool` | `ht` socket status, REST fallback |
-| `get_broker_positions` | `() → list[dict]` | `getclientexposure` |
-| `broker_refresh` | `()` | Clears cached exposure |
+| `get_broker_positions` | `() → list[dict]` | `getopenposition` (cached) |
+| `get_activity_logs` | `() → list[dict]` | `getactivitylogs` (cached) — for reconciler |
+| `get_upper_cap_room_pct` | `(symbol, price) → float` | (upper_cap - price)/price × 100; -1 if not loaded |
+| `broker_refresh` | `()` | Force-refresh all BrokerView caches |
 
 Installed via `daily_trader_hooks.install_hooks()` after login.
 
@@ -139,34 +143,84 @@ throttled to **1 eval per 2 s per symbol** via a timestamp cache.
 
 ---
 
-## Entry Signal Scoring
+## Entry Signal Scoring (2026-05-29)
 
 ```python
-score = chg_pct × (log10(volume) / 5) × vwap_bonus
-vwap_bonus = max(0.2, 1.0 - pct_above_vwap × 0.1)
+score = chg_pct
+        × (log10(volume) / 5)           # vol_factor   — liquidity
+        × vwap_bonus                     # ≤1 above VWAP, >1 below
+        × (1 / (1 + spread_pct))         # spread_factor — penalize wide markets
+        × (0.5 + bid_vol / (bid_vol+ask_vol))   # book_factor — buyer-side bias
+
+vwap_bonus  = max(0.2, 1.0 - pct_above_vwap × 0.1)
+book_factor ∈ [0.5, 1.5]   # 0.5 if all ask, 1.0 balanced, 1.5 if all bid
 ```
 
 - `chg_pct` — % change from previous close
-- Volume term normalises score across different float sizes
-- `vwap_bonus` penalises entries when price is running above VWAP
+- `vol_factor` — log-scaled day volume, normalizes across float sizes
+- `vwap_bonus` — penalises entries running above VWAP (institutional fair value)
+- `spread_factor` — soft penalty for wide markets (doesn't reject)
+- `book_factor` — reward when bid volume > ask volume (more buyers visible)
 
-**Rejected if:**
-- `use_vwap_filter=True` and `(last - vwap)/vwap × 100 > vwap_max_above_pct`
-- Price outside circuit limits (checked in `place_limit_buy`)
-- Market not open, time gates, concurrent cap, daily order cap, daily loss limit
+**Rejected if (`sig.rejected != ""`):**
+
+- `change<min` / `change>max` — outside `[min_change_pct, max_change_pct]`
+- `volume<min` — below `min_volume`
+- `price<min` / `price>max`
+- `spread>max` — `(ask-bid)/bid × 100 > max_spread_pct`
+- `no_quote` — bid or ask is zero
+- `already_held` — bot already has a non-closed position on this symbol
+- `above_vwap` — `(last-vwap)/vwap × 100 > vwap_max_above_pct` (only if `use_vwap_filter`)
+- `near_upper_cap` — within `min_cap_room_pct` of upper circuit limit (uses cap_limits cache)
+- `broker_busy` — broker has any blocking activity on this symbol today
+
+Hard pre-entry gates (in `_can_take_new_entry`): market open, time window
+`[entry_start_hhmm, entry_stop_hhmm]`, `slots_used < max_concurrent`,
+`trade_count_today < max_orders_per_day`, no loss cooldown, daily loss limit not hit.
 
 ---
 
-## Position Sizing Formula
+## Position Sizing Formula (2026-05-29)
+
+Per-slot cash allocation prevents a single trade from starving the other concurrent
+slots when balance is low. In-flight tracking prevents back-to-back orders from being
+sized against the same stale cash value.
 
 ```python
-qty = floor(cash × risk_pct/100 / (price × stop_pct/100))
-# Then cap at:
-qty = min(qty, floor(cash × 0.95 / price))       # 95% cash ceiling
-qty = min(qty, floor(max_buy_amount / price))     # per-trade PKR cap
-qty = min(qty, floor(remaining_daily / price))    # daily PKR cap
-qty = min(qty, ask_depth_vol × 3)                 # don't overwhelm ask
+# Step 1 — Effective cash (subtract what's already pledged but not yet filled)
+in_flight_commit = Σ(p.entry_price × p.qty
+                     for p in positions
+                     if p.status == "pending_entry")
+available_cash   = max(0, broker_cash - in_flight_commit)
+
+# Step 2 — Per-slot budget
+slots_used      = count of pending_entry + holding + pending_exit
+slots_remaining = max(1, max_concurrent - slots_used)
+per_slot_budget = available_cash / slots_remaining
+
+# Step 3 — Minimum sensible trade size
+if per_slot_budget < min_trade_notional:
+    skip entry  (logs "skip entry: per-slot budget below floor")
+
+# Step 4 — Sizing: Kelly capped by per-slot budget
+risk_amount    = available_cash × risk_per_trade_pct / 100
+per_share_risk = price × stop_pct / 100
+qty_kelly      = floor(risk_amount / per_share_risk)
+qty_budget     = floor(per_slot_budget / price)
+qty            = max(0, min(qty_kelly, qty_budget))
+
+# Step 5 — Further PKR caps (unchanged)
+qty = min(qty, floor(max_buy_amount_per_trade / entry_price))
+qty = min(qty, floor((daily_max_buy_amount - daily_buy_value) / entry_price))
+qty = min(qty, ask_depth_vol × 3)
 ```
+
+**Removed in this version:** the standalone `qty = min(qty, floor(cash × 0.95 / price))`
+"95 % cash" rail — replaced by the per-slot budget, which is stricter and slot-aware.
+
+**Worked example** (Rs 1,716 cash, max_concurrent=3, MUGHAL @ 76.79):
+- pre-rewrite: qty = 21 shares = Rs 1,613 = 94 % of cash → 1 trade only
+- post-rewrite: per_slot = 572, qty = 7 shares = Rs 537 → room for 2 more entries
 
 ---
 

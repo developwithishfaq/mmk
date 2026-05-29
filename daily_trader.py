@@ -129,6 +129,18 @@ class Hooks:
     # /getopenposition). Used for periodic reconciliation.
     get_broker_positions: Optional[Callable[[], list[dict]]] = None
 
+    # Returns today's broker activity log (parsed rows from /getactivitylogs:
+    # symbol, side, status, ordered_qty, filled_qty, order_price, order_time,
+    # house_order_id, exch_order_id, ...). Authoritative source of truth for
+    # whether our pending_entry / pending_exit orders actually filled — used
+    # by the reconciler to heal state when socket messages are missed.
+    get_activity_logs: Optional[Callable[[], list[dict]]] = None
+
+    # Returns how far `price` is below the upper circuit limit, as a percent.
+    # Returns -1.0 if the cap for that symbol is unknown (not yet loaded).
+    # Used by the signal filter to reject entries near a circuit halt.
+    get_upper_cap_room_pct: Optional[Callable[[str, float], float]] = None
+
     # Force-refresh every BrokerView cache (manual Sync from Broker).
     broker_refresh: Optional[Callable[[], dict]] = None
 
@@ -152,7 +164,7 @@ class Config:
     max_price:             float  = 55.0    # max stock price to consider (PKR)
 
     # ── Position sizing ──────────────────────────────────────────
-    risk_per_trade_pct:    float  = 2.0     # 2% of cash risked per trade (primary formula)
+    risk_per_trade_pct:    float  = 2.0     # 2% of cash risked per trade (Kelly formula)
     max_concurrent:        int    = 3           # max simultaneous open positions
     # Safety caps (PKR hard limits, applied after the risk formula)
     max_orders_per_day:    int    = 6           # max entry orders per day
@@ -160,6 +172,16 @@ class Config:
     max_sell_amount_per_trade: float = 1_000.0   # max PKR on a single sell
     daily_max_buy_amount:      float = 10_000.0  # max PKR total buys today
     daily_max_sell_amount:     float = 10_000.0  # max PKR total sells today
+
+    # Per-slot allocation: cash is divided equally across remaining concurrent
+    # slots so a single trade can never starve the others. Already-pledged but
+    # unfilled (pending_entry) cash is subtracted before the split.
+    # Minimum sensible notional per trade — below this, skip the entry rather
+    # than place an order so tiny it isn't worth the round-trip + fees.
+    min_trade_notional:    float  = 300.0
+    # Reject signals when last price is within this % of the upper circuit
+    # limit (stock about to halt). Set 0 to disable.
+    min_cap_room_pct:      float  = 1.0
 
     # ── Entry signal (upper bound) ───────────────────────────────
     # Reject stocks already up more than this — move likely exhausted near
@@ -1085,17 +1107,39 @@ class DailyTrader:
         chg_pct = (chg / max(last - chg, 0.01)) * 100 if last - chg > 0 else 0.0
         spread  = ((ask - bid) / bid * 100) if bid > 0 else 999.0
 
-        # ── Score: momentum × liquidity × VWAP-proximity bonus ──────────
-        # Stocks at or below VWAP are buying near fair institutional value and
-        # score higher; stocks far above VWAP score lower (move already done).
-        # Formula: chg_pct × log10(vol)/5 × vwap_bonus
+        # Bid/ask volumes — used for liquidity / imbalance signal.
+        try:
+            bid_vol = int(float(row.get("bid_vol") or row.get("bidVol") or 0))
+        except (TypeError, ValueError):
+            bid_vol = 0
+        try:
+            ask_vol = int(float(row.get("ask_vol") or row.get("askVol") or 0))
+        except (TypeError, ValueError):
+            ask_vol = 0
+
+        # ── Score: momentum × liquidity × VWAP × spread × book imbalance ──
+        # - chg_pct        : momentum (positive change)
+        # - vol_factor     : liquidity proxy (log of day volume)
+        # - vwap_bonus     : reward stocks at/below institutional fair value
+        # - spread_factor  : penalize wide markets without rejecting outright
+        # - book_factor    : reward bid_vol > ask_vol (more buyers than sellers)
         vol_factor = math.log10(max(vol, 1)) / 5.0
         vwap_bonus = 1.0
         if vwap > 0:
             pct_above_vwap = (last - vwap) / vwap * 100.0
             # +10 % bonus per 0.1 % *below* VWAP; −10 % penalty per 0.1 % *above*.
             vwap_bonus = max(0.2, 1.0 - pct_above_vwap * 0.1)
-        score = chg_pct * vol_factor * vwap_bonus
+        # Spread penalty: tight markets (0% spread) → 1.0, wide markets fade.
+        # spread is in %, so spread=0.5% gives factor ~1/(1+0.5) = 0.67.
+        spread_factor = 1.0 / (1.0 + max(0.0, spread))
+        # Book imbalance: ratio of buy-side depth to total visible depth.
+        # 0.5 (balanced) → 1.0. Heavy bid side (e.g. 0.75) → 1.25. Heavy ask → 0.75.
+        book_factor = 1.0
+        total_book = bid_vol + ask_vol
+        if total_book > 0:
+            buy_share = bid_vol / total_book
+            book_factor = 0.5 + buy_share  # range [0.5, 1.5]
+        score = chg_pct * vol_factor * vwap_bonus * spread_factor * book_factor
 
         sig = Signal(
             symbol=sym, last_price=last, change_pct=chg_pct,
@@ -1121,6 +1165,21 @@ class DailyTrader:
             pct_above_vwap = (last - vwap) / vwap * 100.0
             if pct_above_vwap > cfg.vwap_max_above_pct:
                 reasons.append("above_vwap")
+
+        # Near-circuit-limit guard: PSX halts a stock when it hits its upper
+        # cap. Entering near the cap means almost no upside before halt + a
+        # high risk of a quick reverse to flush bidders.
+        if (
+            cfg.min_cap_room_pct > 0
+            and self._hooks
+            and self._hooks.get_upper_cap_room_pct is not None
+        ):
+            try:
+                room_pct = float(self._hooks.get_upper_cap_room_pct(sym, last))
+                if 0.0 <= room_pct < cfg.min_cap_room_pct:
+                    reasons.append("near_upper_cap")
+            except Exception:
+                pass
 
         # Broker-truth gate (via has_blocking_order_for under the hood):
         #   BLOCK  — live outstanding order (not yet terminal), OR filled/partial today.
@@ -1258,36 +1317,82 @@ class DailyTrader:
             cash = float(self._hooks.get_cash() or 0.0)
         except Exception:
             cash = 0.0
-        if cash <= 0:
-            self._emit("warn", "no cash available, skipping entry", {"sym": sig.symbol})
+
+        # In-flight commitment: cash already pledged to pending_entry orders
+        # that the broker hasn't deducted yet. Critical for back-to-back orders
+        # placed within one tick — without this, the bot sizes the second order
+        # against pre-first-order cash and the broker rejects.
+        with self._lock:
+            in_flight_commit = sum(
+                (p.entry_price * p.qty)
+                for p in self._positions.values()
+                if p.status == "pending_entry"
+            )
+            slots_used = sum(
+                1 for p in self._positions.values()
+                if p.status in ("pending_entry", "holding", "pending_exit")
+            )
+
+        available_cash = max(0.0, cash - in_flight_commit)
+        if available_cash <= 0:
+            self._emit("warn", "no cash available, skipping entry", {
+                "sym":         sig.symbol,
+                "cash":        round(cash, 2),
+                "in_flight":   round(in_flight_commit, 2),
+            })
             return
 
-        # ── Position sizing: risk-based Kelly (single master formula) ──
+        # Per-slot allocation: equally divide available cash across remaining
+        # concurrent slots (this entry + however many can still open after it).
+        # Replaces the previous "95% of cash" rail that let one trade starve
+        # the rest. Caps below (max_buy_amount_per_trade, daily_max_buy_amount,
+        # ask-depth) still apply on top of this.
+        slots_remaining = max(1, cfg.max_concurrent - slots_used)
+        per_slot_budget = available_cash / slots_remaining
+
+        # Minimum sensible trade size — skip rather than place an order so
+        # tiny it isn't worth the round-trip and fees.
+        min_notional = max(0.0, cfg.min_trade_notional)
+        if per_slot_budget < min_notional:
+            self._emit("warn", "skip entry: per-slot budget below floor", {
+                "sym":              sig.symbol,
+                "cash":             round(cash, 2),
+                "in_flight":        round(in_flight_commit, 2),
+                "available_cash":   round(available_cash, 2),
+                "slots_used":       slots_used,
+                "slots_remaining":  slots_remaining,
+                "per_slot_budget":  round(per_slot_budget, 2),
+                "min_required":     min_notional,
+            })
+            return
+
+        # ── Position sizing: Kelly risk-based, capped by per-slot budget ──
         #
-        # How many shares to buy so that if the stop triggers,
-        # we lose exactly risk_per_trade_pct % of available cash?
+        # Kelly: choose qty so that if the stop triggers, we lose exactly
+        # risk_per_trade_pct % of *available* cash (excludes in-flight).
+        #   qty_kelly = floor( (available × risk_pct/100) / (price × stop_pct/100) )
         #
-        #   qty = floor( (cash × risk_pct/100) / (price × stop_pct/100) )
+        # Budget: never put more than the per-slot allocation into one trade.
+        #   qty_budget = floor( per_slot_budget / price )
         #
-        # One hard safety rail after: never commit more than 95% of cash.
-        # PKR caps (max_buy_amount_per_trade, daily_max_buy_amount) applied below.
-        risk_amount    = cash * (cfg.risk_per_trade_pct / 100.0)
+        # Final qty = min(Kelly, budget). Further capped by PKR caps below.
+        risk_amount    = available_cash * (cfg.risk_per_trade_pct / 100.0)
         per_share_risk = sig.last_price * (cfg.stop_pct / 100.0)
         if per_share_risk <= 0:
             return
-        qty = math.floor(risk_amount / per_share_risk)
-
-        # Hard ceiling: never spend more than 95% of cash on one trade.
-        qty = min(qty, math.floor(cash * 0.95 / sig.last_price))
-
-        qty = max(0, qty)
+        qty_kelly  = math.floor(risk_amount / per_share_risk)
+        qty_budget = math.floor(per_slot_budget / sig.last_price)
+        qty = max(0, min(qty_kelly, qty_budget))
         if qty <= 0:
             self._emit("warn", "qty=0 after sizing", {
-                "sym":             sig.symbol,
-                "cash":            cash,
-                "price":           sig.last_price,
-                "risk_amount":     round(risk_amount, 2),
-                "per_share_risk":  round(per_share_risk, 4),
+                "sym":              sig.symbol,
+                "price":            sig.last_price,
+                "available_cash":   round(available_cash, 2),
+                "per_slot_budget":  round(per_slot_budget, 2),
+                "risk_amount":      round(risk_amount, 2),
+                "per_share_risk":   round(per_share_risk, 4),
+                "qty_kelly":        qty_kelly,
+                "qty_budget":       qty_budget,
             })
             return
 
@@ -1621,6 +1726,11 @@ class DailyTrader:
         the user manually sold it in the dashboard, or a SLO triggered
         outside our knowledge), mark it closed with reason 'broker_drift'
         so it's surfaced in the events log for investigation.
+
+        Safety rule: if the broker positions feed returns empty, treat that
+        as "I don't know" (cache not yet populated, session displaced, REST
+        call failed), NOT "broker has no positions". Acting on empty data
+        would destructively close every holding on a transient hiccup.
         """
         if not self._hooks or self._hooks.get_broker_positions is None:
             return
@@ -1629,6 +1739,12 @@ class DailyTrader:
         except Exception as e:
             log.warning(f"reconcile fetch failed: {e}")
             return
+        # Bail if broker view has nothing yet — we cannot distinguish "broker
+        # really has no positions" from "cache empty / fetch failed". Refusing
+        # to act on absence is the safe choice.
+        if not rows:
+            return
+
         broker_pos = {}
         for r in rows:
             sym = (r.get("symbol") or "").upper()

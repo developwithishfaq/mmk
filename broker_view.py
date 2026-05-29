@@ -217,6 +217,12 @@ class BrokerView:
                 if (a.get("symbol") or "").upper() == sym
             ]
 
+    def activity_today_all(self) -> list[dict]:
+        """Return today's full activity log (all symbols, all statuses)."""
+        self._maybe_refresh("activity")
+        with self._lock:
+            return list(self._activity)
+
     # Statuses that mean the order actually worked (fully or partially).
     # An order with one of these statuses means capital is deployed or
     # a real position exists — block a second entry on the same symbol.

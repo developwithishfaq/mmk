@@ -118,21 +118,28 @@ def on_message(name: str, raw: str, parsed: dict) -> None:  # noqa: C901
                     break
 
             # Fallback: most-recent pending order by symbol + side.
-            # IMPORTANT: never grab a daily-trader order this way — strict match only.
+            # Two passes: non-DT first (preserves prior behavior for manual
+            # orders), then DT orders (the broker rewrites client_order_id
+            # to its own short alias, so DT orders can never match strictly).
             if not matched_hash and symbol and side_label:
-                candidates = []
+                non_dt: list[tuple[float, str]] = []
+                dt_cands: list[tuple[float, str]] = []
                 for h, o in runtime.orders.items():
-                    if o.get("daily_trader"):
-                        continue
                     if (
                         o.get("symbol") == symbol
                         and o.get("side") == side_label
                         and o.get("status") in {"sent", "delivered", "new"}
                     ):
-                        candidates.append((o.get("created_ts", 0.0), h))
-                if candidates:
-                    candidates.sort(reverse=True)
-                    matched_hash = candidates[0][1]
+                        bucket = dt_cands if o.get("daily_trader") else non_dt
+                        bucket.append((o.get("created_ts", 0.0), h))
+                pick = non_dt or dt_cands
+                if pick:
+                    pick.sort(reverse=True)
+                    matched_hash = pick[0][1]
+                    # Cache the broker's client_order_id so subsequent PMs
+                    # for this order match strictly without falling back.
+                    if matched_hash and client_ord_id:
+                        runtime.orders[matched_hash]["client_order_id"] = client_ord_id
 
             key   = matched_hash or exch_order_id or client_ord_id
             entry = runtime.orders.get(key, {})
@@ -195,6 +202,21 @@ def on_message(name: str, raw: str, parsed: dict) -> None:  # noqa: C901
             log.info(f"[OR] Order accepted  ordHash={ord_hash}")
         else:
             log.warning(f"[OR] Order rejected  ordHash={ord_hash}  msg={d.get('msg')}")
+            with runtime.orders_lock:
+                entry = runtime.orders.get(ord_hash) or {}
+                entry["status"] = "rejected"
+                entry["last_update_ts"] = time.time()
+                if ord_hash and ord_hash not in runtime.orders:
+                    entry["ord_hash"] = ord_hash
+                    runtime.orders[ord_hash] = entry
+                sym = entry.get("symbol", "")
+            if ord_hash:
+                try:
+                    bot = daily_trader.get()
+                    if ord_hash in bot._ord_to_pos:
+                        bot.on_order_update(ord_hash, "rejected", symbol=sym)
+                except Exception as e:
+                    log.warning(f"daily_trader OR reject reconcile failed: {e}")
 
     # ── mr: market reject ───────────────────────────────────────────────────
     elif t == "mr":

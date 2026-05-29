@@ -1,6 +1,6 @@
 # Wiki Index
 
-**Last updated:** 2026-05-10
+**Last updated:** 2026-05-29
 
 ---
 
@@ -25,5 +25,6 @@
 
 | Page | Summary |
 |------|---------|
-| [daily_trader.md](daily_trader.md) | DailyTrader state machine, config params, entry/exit logic, VWAP filter |
+| [daily_trader.md](daily_trader.md) | DailyTrader state machine, config params, entry/exit logic, VWAP filter, per-slot sizing (2026-05-29) |
+| [reliability.md](reliability.md) | Sources of order-status truth (socket vs REST), session displacement, reconciler design, PM/OR routing fixes (2026-05-29) |
 | [known_issues.md](known_issues.md) | Bugs found and fixed, gotchas, non-obvious broker behaviours |

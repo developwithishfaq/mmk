@@ -141,6 +141,36 @@ def dt_get_broker_positions() -> list[dict]:
         return []
 
 
+def dt_get_activity_logs() -> list[dict]:
+    """Return today's full broker activity log (cached via BrokerView, TTL=10s)."""
+    try:
+        return list(get_broker_view().activity_today_all())
+    except Exception as e:
+        log.warning(f"daily_trader get_activity_logs failed: {e}")
+        return []
+
+
+def dt_get_upper_cap_room_pct(symbol: str, price: float) -> float:
+    """
+    Return (upper_cap - price) / price * 100, or -1.0 if cap not loaded.
+    Used by the signal filter to skip stocks near a circuit halt.
+    """
+    if not symbol or price <= 0:
+        return -1.0
+    key = f"{MARKET_REG}_{symbol.upper()}"
+    with runtime.cap_limits_lock:
+        limits = runtime.cap_limits.get(key)
+    if not limits:
+        return -1.0
+    try:
+        upper = float(limits.get("upper") or 0.0)
+    except (TypeError, ValueError):
+        return -1.0
+    if upper <= 0:
+        return -1.0
+    return (upper - price) / price * 100.0
+
+
 def dt_broker_refresh() -> dict:
     try:
         return get_broker_view().refresh() or {}
@@ -283,6 +313,8 @@ def install_hooks() -> None:
         broker_has_any_today=dt_broker_has_any_today,
         broker_market_open=dt_broker_market_open,
         get_broker_positions=dt_get_broker_positions,
+        get_activity_logs=dt_get_activity_logs,
+        get_upper_cap_room_pct=dt_get_upper_cap_room_pct,
         broker_refresh=dt_broker_refresh,
     )
     daily_trader.get().set_hooks(hooks)
